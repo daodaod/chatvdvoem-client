@@ -52,8 +52,10 @@ class Chatter(object):
         START_TYPING, STOP_TYPING = 'start_typing', 'stop_typing'
         WAIT_OPPONENT, WAIT_NEW_OPPONENT = 'wait_opponent', 'wait_new_opponent'
 
-    def __init__(self, logger):
+    def __init__(self, logger=None):
         super(Chatter, self).__init__()
+        if logger is None:
+            logger = logging.getLogger(self.__class__.__name__)
         self.logger = logger
 
         self.uid = None
@@ -91,7 +93,7 @@ class Chatter(object):
 
     def sender_thread(self):
         try:
-            while True:
+            while not self.disconnected:
                 data = self.send_queue.get()
                 if data is None:
                     break
@@ -143,7 +145,7 @@ class Chatter(object):
     def chat_new_opponent(self):
         self.send_data(Chatter.CHAT_URL, 'send', action='wait_new_opponent')
 
-    def chat_wait_opponent(self):
+    def wait_opponent_thread(self):
         i = 0
         while not self.connected and not self.disconnected:
             if i % 3 == 0:
@@ -235,7 +237,7 @@ class Chatter(object):
         self.sender_thread.start()
         self.get_uid()
         self.get_chat_key()
-        threading.Thread(target=self.chat_wait_opponent).start()
+        threading.Thread(target=self.wait_opponent_thread).start()
         iteration = 0
         start_time = time.time()
         try:
@@ -257,7 +259,6 @@ class Chatter(object):
                 if time.time() - self.last_stanza_sent > self.PING_FREQUENCY:
                     self.logger.info("Sending ping")
                     self.send_data(action=Chatter.Actions.PING)
-
         finally:
             self.logger.info("Quitting")
             self.disconnected = True
@@ -274,32 +275,4 @@ if __name__ == '__main__':
     logger.addHandler(logging.StreamHandler())
     chatter = Chatter(logger)
     chatter.serve_conversation()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
