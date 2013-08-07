@@ -8,6 +8,7 @@ import urllib
 import time
 import sys
 import logging
+import dehtml
 
 from Queue import Queue
 
@@ -215,7 +216,7 @@ class Chatter(object):
             self.on_typing(started=(action == Chatter.Actions.START_TYPING))
         elif action == Chatter.Actions.NEW_MESSAGE:
             if event['user'] != Chatter.USER_ME:
-                self.on_message(event['message'])
+                self.on_message(dehtml.dehtml(event['message']))
         elif action == Chatter.Actions.PING:
             self.on_ping()
         else:
