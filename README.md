@@ -10,6 +10,7 @@ It is called from main module in this way:
 where *script_source* is a raw string containing obfuscated javascript that saves chat key in local variable  *chat_key* after execution.
 
 Example usage:
+
     from chatvdvoem import Chatter
     c = Chatter()
     c.serve_conversation()
