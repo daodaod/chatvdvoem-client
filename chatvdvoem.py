@@ -9,12 +9,6 @@ import time
 import sys
 import logging
 
-try:
-    from chatkey import get_chat_key
-except ImportError:
-    print "You need to write routine that executes JavaScript and gets chat_key"
-    sys.exit(1)
-
 from Queue import Queue
 
 
@@ -52,8 +46,9 @@ class Chatter(object):
         START_TYPING, STOP_TYPING = 'start_typing', 'stop_typing'
         WAIT_OPPONENT, WAIT_NEW_OPPONENT = 'wait_opponent', 'wait_new_opponent'
 
-    def __init__(self, logger=None):
+    def __init__(self, chat_key_extractor, logger=None):
         super(Chatter, self).__init__()
+        self.chat_key_extractor = chat_key_extractor
         if logger is None:
             logger = logging.getLogger(self.__class__.__name__)
         self.logger = logger
@@ -166,7 +161,7 @@ class Chatter(object):
 
     def get_chat_key(self):
         script = self.send(Chatter.CHAT_URL, 'key', {'_':str(time.time())})
-        chat_key = get_chat_key(script)
+        chat_key = self.chat_key_extractor(script)
         if not chat_key:
             raise BadChatKey
         self.chat_key = chat_key
@@ -266,13 +261,15 @@ class Chatter(object):
             self.on_shutdown()
 
 
-
-
-
 if __name__ == '__main__':
     logger = logging.getLogger('Chatvdvoem')
     logger.setLevel(logging.INFO)
     logger.addHandler(logging.StreamHandler())
-    chatter = Chatter(logger)
+    try:
+        from chatkey import get_chat_key as chat_key_extractor
+    except ImportError:
+        print "You need to write routine that executes JavaScript and gets chat_key"
+        sys.exit(1)
+    chatter = Chatter(chat_key_extractor, logger)
     chatter.serve_conversation()
 
