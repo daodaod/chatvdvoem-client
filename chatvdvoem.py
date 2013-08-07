@@ -92,7 +92,7 @@ class Chatter(object):
                 data = self.send_queue.get()
                 if data is None:
                     break
-                chatter._send_data(**data)
+                self._send_data(**data)
         finally:
             self.disconnected = True
 
