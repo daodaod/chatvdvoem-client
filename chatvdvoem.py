@@ -50,9 +50,7 @@ class Chatter(object):
     def __init__(self, chat_key_extractor, logger=None):
         super(Chatter, self).__init__()
         self.chat_key_extractor = chat_key_extractor
-        if logger is None:
-            logger = logging.getLogger(self.__class__.__name__)
-        self.logger = logger
+        self.logger = logger or logging.getLogger(__name__)
 
         self.uid = None
         self.cid = None
@@ -186,6 +184,10 @@ class Chatter(object):
     def on_shutdown(self):
         ''' This routine is called when serve_conversation exits '''
         pass
+
+    def quit(self):
+        self.send_stop_chat()
+        self.disconnected = True
 
     def read_realplexor(self):
         if not self.realplexor_ids:
