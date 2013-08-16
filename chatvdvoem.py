@@ -10,7 +10,7 @@ import sys
 import logging
 import dehtml
 
-from Queue import Queue
+import Queue
 
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:22.0) Gecko/20100101 Firefox/22.0',
@@ -88,10 +88,12 @@ class Chatter(object):
     def sender_thread(self):
         try:
             while not self.disconnected:
-                data = self.send_queue.get()
-                if data is None:
-                    break
-                self._send_data(**data)
+                try:
+                    data = self.send_queue.get(timeout=1)
+                except Queue.Empty:
+                    pass
+                else:
+                    self._send_data(**data)
         finally:
             self.disconnected = True
 
@@ -228,7 +230,6 @@ class Chatter(object):
         ''' This procedure is called when another event is processed, so you can add timeout checks here '''
         pass
 
-
     def serve_conversation(self):
         ''' Serve one conversation till another users sends stop_chat or
         connection breaks or times out '''
@@ -258,9 +259,8 @@ class Chatter(object):
                     self.logger.info("Sending ping")
                     self.send_data(action=Chatter.Actions.PING)
         finally:
-            self.logger.info("Quitting")
             self.disconnected = True
-            self.send_queue.put(None)
+            self.logger.info("Quitting")
             self.on_shutdown()
 
 
@@ -273,6 +273,7 @@ if __name__ == '__main__':
     except ImportError:
         print "You need to write routine that executes JavaScript and gets chat_key"
         sys.exit(1)
-    chatter = Chatter(chat_key_extractor, logger)
-    chatter.serve_conversation()
+    while True:
+        chatter = Chatter(chat_key_extractor, logger)
+        chatter.serve_conversation()
 
