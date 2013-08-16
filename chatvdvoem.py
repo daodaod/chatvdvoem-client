@@ -64,7 +64,7 @@ class Chatter(object):
         self.opener = urllib2.build_opener()
         self.opener.addheaders = HEADERS.items()
 
-        self.send_queue = Queue()
+        self.send_queue = Queue.Queue()
         self.unsent = []
         self.sender_thread = threading.Thread(target=self.sender_thread)
 
