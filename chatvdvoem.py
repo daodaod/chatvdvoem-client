@@ -8,9 +8,9 @@ import urllib
 import time
 import sys
 import logging
-import dehtml
-
 import Queue
+
+import dehtml
 
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:22.0) Gecko/20100101 Firefox/22.0',
@@ -24,6 +24,7 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:22.0) Gecko/201
 
 class BadChatKey(Exception):
     ''' Raised when get_chat_key routine fails to extract chat_key from javascript mess '''
+
 
 class BadUidResponse(Exception):
     ''' Raised when we fail to get normal uid '''
@@ -138,18 +139,6 @@ class Chatter(object):
         for message in to_send:
             self.send_data(**message)
 
-    def chat_new_opponent(self):
-        self.send_data(Chatter.CHAT_URL, 'send', action='wait_new_opponent')
-
-    def wait_opponent_thread(self):
-        i = 0
-        while not self.connected and not self.disconnected:
-            if i % 3 == 0:
-                self.logger.info("I am still waiting for opponent... %d", i)
-                self._send_data(Chatter.CHAT_URL, 'send', action='wait_opponent')
-            i += 1
-            time.sleep(1)
-
     def get_uid(self):
         self.logger.info("Getting uid")
         result = self._send_data(Chatter.CHAT_URL, 'send', action='get_uid')
@@ -161,7 +150,7 @@ class Chatter(object):
         self.logger.info("Got uid %r", self.uid)
 
     def get_chat_key(self):
-        script = self.send(Chatter.CHAT_URL, 'key', {'_':str(time.time())})
+        script = self.send(Chatter.CHAT_URL, 'key', {'_': str(time.time())})
         chat_key = self.chat_key_extractor(script)
         if not chat_key:
             raise BadChatKey
@@ -233,35 +222,41 @@ class Chatter(object):
     def serve_conversation(self):
         ''' Serve one conversation till another users sends stop_chat or
         connection breaks or times out '''
-        self.sender_thread.start()
-        self.get_uid()
-        self.get_chat_key()
-        threading.Thread(target=self.wait_opponent_thread).start()
-        iteration = 0
-        start_time = time.time()
         try:
-            while not self.disconnected:
-                iteration += 1
-                for event in self.read_realplexor():
-                    self.process_event(event)
-                    self.got_anything = True
-                    if self.connected:
-                        self.last_stanza = time.time()
-                self.idle_proc()
-                if not self.connected:
-                    if time.time() - start_time > self.CHAT_CONNECT_TIMEOUT:
-                        self.logger.error("Failed to find opponent, exiting.")
-                        break
-                    if iteration % 5 == 0:
-                        self.logger.info("I haven't connected yet, so I send wait_new_opponent")
-                        self.chat_new_opponent()
-                if time.time() - self.last_stanza_sent > self.PING_FREQUENCY:
-                    self.logger.info("Sending ping")
-                    self.send_data(action=Chatter.Actions.PING)
+            self._serve_conversation()
         finally:
             self.disconnected = True
             self.logger.info("Quitting")
             self.on_shutdown()
+
+    def _serve_conversation(self):
+        self.get_uid()
+        self.get_chat_key()
+        self.sender_thread.start()
+        wait_opponent_timer = threading.Timer(1, function=lambda self: self._send_data(Chatter.CHAT_URL, 'send',
+                                                                                       action='wait_opponent'),
+                                              args=[self])
+        wait_opponent_timer.start()
+        start_time = time.time()
+        chat_new_opponent_time = time.time()
+        while not self.disconnected:
+            for event in self.read_realplexor():
+                self.process_event(event)
+                self.got_anything = True
+                if self.connected:
+                    self.last_stanza = time.time()
+            self.idle_proc()
+            if not self.connected:
+                if time.time() - start_time > self.CHAT_CONNECT_TIMEOUT:
+                    self.logger.error("Failed to find opponent, exiting.")
+                    break
+                if time.time() - chat_new_opponent_time > 4:
+                    self.logger.info("I haven't connected yet, so I send wait_new_opponent")
+                    self._send_data(Chatter.CHAT_URL, 'send', action='wait_new_opponent')
+                    chat_new_opponent_time = time.time()
+            if time.time() - self.last_stanza_sent > self.PING_FREQUENCY:
+                self.logger.info("Sending ping")
+                self.send_data(action=Chatter.Actions.PING)
 
 
 if __name__ == '__main__':
@@ -276,4 +271,3 @@ if __name__ == '__main__':
     while True:
         chatter = Chatter(chat_key_extractor, logger)
         chatter.serve_conversation()
-
